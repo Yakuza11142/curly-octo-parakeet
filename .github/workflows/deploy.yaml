@@ -1,29 +1,22 @@
-name: mind spark testing apk
-on:
-  push:
-    branches:
-      - main
+name: mind spark apk
+
+on: [push] # This runs the workflow every time you push code
 
 jobs:
-  deploy:
-    environment: playground
+  build_job:
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      id-token: write
-
     steps:
-    - name: Checkout Repo
-      uses: actions/checkout@v4
+      - name: Checkout code
+        uses: actions/checkout@v4 # Essential: it lets the runner "see" your files
 
-    - name: Deploy
-      uses: DefangLabs/defang-github-action@v1.1.0
-      path: |
-        path/output/bin/
-        path/output/test-results
-  - name: Upload Logs on Failure
-    if: failure()
-    uses: actions/upload-artifact@v4
-    with:
-      name: failure-logs
-      path: logs/
+      - name: Create a dummy build file
+        run: |
+          mkdir -p output
+          echo "Build successful!" > output/build_result.txt
+
+      - name: Upload Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-assets
+          path: output/ # This uploads everything inside the 'output' folder
+          if-no-files-found: error
