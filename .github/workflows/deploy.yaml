@@ -18,3 +18,12 @@ jobs:
 
     - name: Deploy
       uses: DefangLabs/defang-github-action@v1.1.0
+      path: |
+        path/output/bin/
+        path/output/test-results
+  - name: Upload Logs on Failure
+    if: failure()
+    uses: actions/upload-artifact@v4
+    with:
+      name: failure-logs
+      path: logs/
