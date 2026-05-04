@@ -1,5 +1,4 @@
-name: Deploy
-
+name: mind spark testing apk
 on:
   push:
     branches:
