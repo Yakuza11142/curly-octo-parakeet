@@ -1,22 +1,37 @@
-name: mind spark apk
+name: Deploy Vector Engine to GitHub Pages
 
-on: [push] # This runs the workflow every time you push code
+on:
+  push:
+    branches: ["main"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: "pages"
+  cancel-in-progress: true
 
 jobs:
-  build_job:
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4 # Essential: it lets the runner "see" your files
+      - name: Checkout Repository
+        uses: actions/checkout@v4
 
-      - name: Create a dummy build file
-        run: |
-          mkdir -p output
-          echo "Build successful!" > output/build_result.txt
+      - name: Setup Pages
+        uses: actions/configure-pages@v4
 
       - name: Upload Artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-pages-artifact@v3
         with:
-          name: build-assets
-          path: output/ # This uploads everything inside the 'output' folder
-          if-no-files-found: error
+          path: './public' # Point to directory containing index.html
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
