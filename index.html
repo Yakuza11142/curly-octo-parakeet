@@ -6,21 +6,21 @@
     <title>Real-World Vector Projection Engine</title>
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
-        body { background-color: #0b0f19; color: #f8fafc; font-family: system-ui, sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; overflow: hidden; }
-        h1 { position: absolute; top: 12px; z-index: 10; font-size: 1.1rem; color: #38bdf8; text-transform: uppercase; letter-spacing: 1px; background: rgba(15, 23, 42, 0.8); padding: 6px 12px; border-radius: 20px; }
-        .stage { position: relative; width: 100vw; height: 100vh; }
+        body { background-color: #000; color: #f8fafc; font-family: system-ui, sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; overflow: hidden; }
+        h1 { position: absolute; top: 12px; z-index: 10; font-size: 1rem; color: #38bdf8; text-transform: uppercase; letter-spacing: 1px; background: rgba(15, 23, 42, 0.85); padding: 6px 14px; border-radius: 20px; border: 1px solid #0284c7; }
+        .stage { position: relative; width: 100vw; height: 100vh; background: #000; }
         video { position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover; z-index: 1; }
         canvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 2; pointer-events: none; }
-        .controls { position: absolute; bottom: 20px; z-index: 10; display: flex; gap: 10px; width: 90%; justify-content: center; }
-        button { background: #0284c7; color: #fff; border: none; padding: 12px 20px; border-radius: 8px; font-weight: 600; cursor: pointer; box-shadow: 0 4px 12px rgba(0,0,0,0.4); z-index: 10; }
+        .controls { position: absolute; bottom: 25px; z-index: 10; display: flex; gap: 10px; width: 90%; justify-content: center; }
+        button { background: #0284c7; color: #fff; border: none; padding: 12px 24px; border-radius: 8px; font-weight: 600; cursor: pointer; box-shadow: 0 4px 12px rgba(0,0,0,0.5); z-index: 10; font-size: 0.9rem; }
         button:active { background: #0369a1; }
-        #info { position: absolute; top: 50px; z-index: 10; font-size: 0.8rem; color: #94a3b8; text-align: center; width: 100%; }
+        #info { position: absolute; top: 52px; z-index: 10; font-size: 0.75rem; color: #94a3b8; text-align: center; width: 100%; text-shadow: 0 1px 2px rgba(0,0,0,0.8); }
     </style>
 </head>
 <body>
 
-    <h1>AR Real-World Vector Projection</h1>
-    <div id="info">Tap anywhere on the live camera feed to project vectors into your room.</div>
+    <h1>AR Vector Projection</h1>
+    <div id="info">Initializing camera feed for real-world room projection...</div>
 
     <div class="stage">
         <video id="webcam" autoplay playsinline muted></video>
@@ -28,8 +28,8 @@
     </div>
 
     <div class="controls">
-        <button onclick="startCamera()">Enable Camera</button>
-        <button onclick="clearProjections()">Clear Projections</button>
+        <button onclick="startCamera()">Restart Camera</button>
+        <button onclick="recenterGlobe()">Recenter Globe</button>
     </div>
 
     <script>
@@ -39,18 +39,17 @@
 
         let angleX = 0, angleY = 0;
         
-        // Default projection right in the center of your room view
-        let activeProjections = [
-            { x: window.innerWidth / 2, y: window.innerHeight / 2, scale: 1.0 }
-        ]; 
+        let projectionTarget = {
+            x: window.innerWidth / 2,
+            y: window.innerHeight / 2,
+            scale: 1.2
+        };
 
         function resizeCanvas() {
             canvas.width = window.innerWidth;
             canvas.height = window.innerHeight;
-            if(activeProjections.length > 0) {
-                activeProjections[0].x = canvas.width / 2;
-                activeProjections[0].y = canvas.height / 2;
-            }
+            projectionTarget.x = canvas.width / 2;
+            projectionTarget.y = canvas.height / 2;
         }
         window.addEventListener('resize', resizeCanvas);
 
@@ -62,28 +61,24 @@
                 video.srcObject = stream;
                 await video.play();
                 resizeCanvas();
+                document.getElementById('info').innerText = "Live camera active. Globe projecting into your room.";
             } catch (err) {
                 try {
                     const fallbackStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
                     video.srcObject = fallbackStream;
                     await video.play();
                     resizeCanvas();
+                    document.getElementById('info').innerText = "Live camera active (Fallback). Globe projecting into your room.";
                 } catch (e) {
-                    alert("Camera error: " + e.message);
+                    document.getElementById('info').innerText = "Camera access required for room projection.";
                 }
             }
         }
 
-        // Tap screen to place more vector globes onto physical objects in your room
-        window.addEventListener('click', (e) => {
-            if (e.target.tagName !== 'BUTTON') {
-                activeProjections.push({
-                    x: e.clientX,
-                    y: e.clientY,
-                    scale: 0.8 + Math.random() * 0.4
-                });
-            }
-        });
+        function recenterGlobe() {
+            projectionTarget.x = window.innerWidth / 2;
+            projectionTarget.y = window.innerHeight / 2;
+        }
 
         function generateSphereVectors(radius, rings, segments) {
             const vertices = [], edges = [];
@@ -108,7 +103,7 @@
             return { vertices, edges };
         }
 
-        const ballModel = generateSphereVectors(60, 10, 10);
+        const ballModel = generateSphereVectors(70, 10, 10);
 
         function projectPoint(point, originX, originY, scale) {
             const radX = angleX * Math.PI / 180, radY = angleY * Math.PI / 180;
@@ -116,7 +111,7 @@
             let z1 = -point.x * Math.sin(radY) + point.z * Math.cos(radY);
             let y2 = point.y * Math.cos(radX) - z1 * Math.sin(radX);
             let z2 = point.y * Math.sin(radX) + z1 * Math.cos(radX);
-            const fov = 300 / (300 + z2);
+            const fov = 350 / (350 + z2);
             return { 
                 x: (x1 * scale * fov) + originX, 
                 y: (y2 * scale * fov) + originY 
@@ -125,40 +120,39 @@
 
         function render() {
             ctx.clearRect(0, 0, canvas.width, canvas.height);
-            angleX += 1.0; 
-            angleY += 1.5;
+            angleX += 0.8; 
+            angleY += 1.2;
 
-            activeProjections.forEach(target => {
-                const projected = ballModel.vertices.map(v => projectPoint(v, target.x, target.y, target.scale));
+            const projected = ballModel.vertices.map(v => projectPoint(v, projectionTarget.x, projectionTarget.y, projectionTarget.scale));
 
-                ctx.strokeStyle = '#00f0ff';
-                ctx.lineWidth = 1;
-                ballModel.edges.forEach(edge => {
-                    if (projected[edge[0]] && projected[edge[1]]) {
-                        ctx.beginPath();
-                        ctx.moveTo(projected[edge[0]].x, projected[edge[0]].y);
-                        ctx.lineTo(projected[edge[1]].x, projected[edge[1]].y);
-                        ctx.stroke();
-                    }
-                });
-
-                ctx.fillStyle = '#ff007f';
-                projected.forEach(p => {
+            ctx.strokeStyle = '#00f0ff';
+            ctx.lineWidth = 1.2;
+            ballModel.edges.forEach(edge => {
+                if (projected[edge[0]] && projected[edge[1]]) {
                     ctx.beginPath();
-                    ctx.arc(p.x, p.y, 2, 0, Math.PI * 2);
-                    ctx.fill();
-                });
+                    ctx.moveTo(projected[edge[0]].x, projected[edge[0]].y);
+                    ctx.lineTo(projected[edge[1]].x, projected[edge[1]].y);
+                    ctx.stroke();
+                }
+            });
+
+            ctx.fillStyle = '#ff007f';
+            projected.forEach(p => {
+                ctx.beginPath();
+                ctx.arc(p.x, p.y, 2.2, 0, Math.PI * 2);
+                ctx.fill();
             });
 
             requestAnimationFrame(render);
         }
 
-        function clearProjections() {
-            activeProjections = [];
-        }
-
         resizeCanvas();
         render();
+        
+        // Automatically attempt to launch the camera feed on page load
+        window.addEventListener('load', () => {
+            startCamera();
+        });
     </script>
 </body>
 </html>
