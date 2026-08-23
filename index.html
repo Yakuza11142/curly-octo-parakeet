@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>3D Vector Sphere Projection</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { background-color: #0b0f19; color: #f8fafc; font-family: system-ui, sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; }
+        h1 { font-size: 1.5rem; margin-bottom: 8px; color: #38bdf8; text-transform: uppercase; }
+        .stage { position: relative; width: 640px; height: 480px; border-radius: 12px; overflow: hidden; border: 2px solid #38bdf8; box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
+        video { width: 100%; height: 100%; object-fit: cover; transform: scaleX(-1); }
+        canvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; }
+        .controls { margin-top: 16px; display: flex; gap: 12px; }
+        button { background: #0284c7; color: #fff; border: none; padding: 10px 18px; border-radius: 6px; font-weight: 600; cursor: pointer; }
+        button:hover { background: #0369a1; }
+    </style>
+</head>
+<body>
+
+    <h1>Vector Projection Engine</h1>
+    <div class="stage">
+        <video id="webcam" autoplay playsinline></video>
+        <canvas id="vectorCanvas" width="640" height="480"></canvas>
+    </div>
+
+    <div class="controls">
+        <button onclick="toggleWireframe()">Toggle Wireframe/Points</button>
+    </div>
+
+    <script>
+        const video = document.getElementById('webcam');
+        const canvas = document.getElementById('vectorCanvas');
+        const ctx = canvas.getContext('2d');
+
+        let angleX = 0, angleY = 0;
+        let showWireframe = true;
+
+        async function startCamera() {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({
+                    video: { width: 640, height: 480, facingMode: "user" }
+                });
+                video.srcObject = stream;
+            } catch (err) {
+                alert("Camera access denied: " + err);
+            }
+        }
+
+        function generateSphereVectors(radius, rings, segments) {
+            const vertices = [], edges = [];
+            for (let i = 0; i <= rings; i++) {
+                const theta = (i * Math.PI) / rings;
+                for (let j = 0; j <= segments; j++) {
+                    const phi = (j * 2 * Math.PI) / segments;
+                    vertices.push({
+                        x: radius * Math.sin(theta) * Math.cos(phi),
+                        y: radius * Math.cos(theta),
+                        z: radius * Math.sin(theta) * Math.sin(phi)
+                    });
+                }
+            }
+            for (let i = 0; i < rings; i++) {
+                for (let j = 0; j < segments; j++) {
+                    const first = i * (segments + 1) + j;
+                    edges.push([first, first + segments + 1]);
+                    edges.push([first, first + 1]);
+                }
+            }
+            return { vertices, edges };
+        }
+
+        const ballModel = generateSphereVectors(120, 14, 14);
+
+        function project(point) {
+            const radX = angleX * Math.PI / 180, radY = angleY * Math.PI / 180;
+            let x1 = point.x * Math.cos(radY) + point.z * Math.sin(radY);
+            let z1 = -point.x * Math.sin(radY) + point.z * Math.cos(radY);
+            let y2 = point.y * Math.cos(radX) - z1 * Math.sin(radX);
+            let z2 = point.y * Math.sin(radX) + z1 * Math.cos(radX);
+            const fov = 400 / (400 + z2);
+            return { x: (x1 * fov) + (canvas.width / 2), y: (y2 * fov) + (canvas.height / 2) };
+        }
+
+        function render() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            angleX += 0.8; angleY += 1.2;
+
+            const projected = ballModel.vertices.map(v => project(v));
+
+            if (showWireframe) {
+                ctx.strokeStyle = '#00f0ff';
+                ctx.lineWidth = 1;
+                ballModel.edges.forEach(edge => {
+                    ctx.beginPath();
+                    ctx.moveTo(projected[edge[0]].x, projected[edge[0]].y);
+                    ctx.lineTo(projected[edge[1]].x, projected[edge[1]].y);
+                    ctx.stroke();
+                });
+            }
+
+            ctx.fillStyle = '#ff007f';
+            projected.forEach(p => {
+                ctx.beginPath();
+                ctx.arc(p.x, p.y, 2, 0, Math.PI * 2);
+                ctx.fill();
+            });
+
+            requestAnimationFrame(render);
+        }
+
+        function toggleWireframe() { showWireframe = !showWireframe; }
+
+        startCamera();
+        render();
+    </script>
+</body>
+</html>
