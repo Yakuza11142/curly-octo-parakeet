@@ -1,0 +1,13 @@
+version: '3.8'
+
+services:
+  vector-projection-app:
+    build: .
+    container_name: vector_projection_engine
+    ports:
+      - "8000:8000"
+    devices:
+      - "/dev/video0:/dev/video0" # Maps local physical camera inside container (Linux)
+    environment:
+      - PYTHONUNBUFFERED=1
+    restart: unless-stopped
