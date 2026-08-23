@@ -1,0 +1,21 @@
+app:
+  name: "Vector Projection Engine"
+  host: "0.0.0.0"
+  port: 8000
+
+camera:
+  device_index: 0
+  frame_width: 640
+  frame_height: 480
+  fps: 30
+
+projection:
+  shape: "sphere"  # Options: sphere, cube
+  radius: 120
+  rings: 16
+  segments: 16
+  rotation_speed_x: 0.015
+  rotation_speed_y: 0.025
+  wireframe_color: [0, 240, 255]  # BGR: Neon Cyan
+  vertex_color: [255, 0, 127]     # BGR: Neon Pink
+  line_thickness: 1
