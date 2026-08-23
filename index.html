@@ -8,42 +8,61 @@
         * { box-sizing: border-box; margin: 0; padding: 0; }
         body { background-color: #0b0f19; color: #f8fafc; font-family: system-ui, sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; }
         h1 { font-size: 1.5rem; margin-bottom: 8px; color: #38bdf8; text-transform: uppercase; }
-        .stage { position: relative; width: 640px; height: 480px; border-radius: 12px; overflow: hidden; border: 2px solid #38bdf8; box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
-        video { width: 100%; height: 100%; object-fit: cover; transform: scaleX(-1); }
+        .stage { position: relative; width: 100vw; max-width: 640px; height: 60vh; max-height: 480px; border-radius: 12px; overflow: hidden; border: 2px solid #38bdf8; box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
+        video { position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover; }
         canvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; }
-        .controls { margin-top: 16px; display: flex; gap: 12px; }
+        .controls { margin-top: 16px; display: flex; gap: 12px; flex-wrap: wrap; justify-content: center; }
         button { background: #0284c7; color: #fff; border: none; padding: 10px 18px; border-radius: 6px; font-weight: 600; cursor: pointer; }
         button:hover { background: #0369a1; }
+        #errorMsg { color: #ef4444; margin-top: 10px; font-size: 0.9rem; text-align: center; }
     </style>
 </head>
 <body>
 
     <h1>Vector Projection Engine</h1>
     <div class="stage">
-        <video id="webcam" autoplay playsinline></video>
-        <canvas id="vectorCanvas" width="640" height="480"></canvas>
+        <!-- added playsinline for mobile iOS/Android compatibility -->
+        <video id="webcam" autoplay playsinline muted></video>
+        <canvas id="vectorCanvas"></canvas>
     </div>
 
     <div class="controls">
+        <button onclick="startCamera()">Start Camera</button>
         <button onclick="toggleWireframe()">Toggle Wireframe/Points</button>
     </div>
+    <div id="errorMsg"></div>
 
     <script>
         const video = document.getElementById('webcam');
         const canvas = document.getElementById('vectorCanvas');
         const ctx = canvas.getContext('2d');
+        const errorMsg = document.getElementById('errorMsg');
 
         let angleX = 0, angleY = 0;
         let showWireframe = true;
+        let stream = null;
+
+        // Resize canvas to match video container
+        function resizeCanvas() {
+            canvas.width = canvas.parentElement.clientWidth;
+            canvas.height = canvas.parentElement.clientHeight;
+        }
+        window.addEventListener('resize', resizeCanvas);
 
         async function startCamera() {
+            errorMsg.innerText = "";
             try {
-                const stream = await navigator.mediaDevices.getUserMedia({
-                    video: { width: 640, height: 480, facingMode: "user" }
+                // Request environment facing camera (back camera) for mobile AR projection
+                stream = await navigator.mediaDevices.getUserMedia({
+                    video: { facingMode: "environment" } 
                 });
                 video.srcObject = stream;
+                // Ensure video plays on mobile
+                video.play();
+                resizeCanvas();
             } catch (err) {
-                alert("Camera access denied: " + err);
+                errorMsg.innerText = "Camera access error: " + err.message + ". Please ensure permissions are granted in your browser settings.";
+                console.error(err);
             }
         }
 
@@ -70,7 +89,8 @@
             return { vertices, edges };
         }
 
-        const ballModel = generateSphereVectors(120, 14, 14);
+        // Adjust radius based on screen size
+        const ballModel = generateSphereVectors(80, 14, 14);
 
         function project(point) {
             const radX = angleX * Math.PI / 180, radY = angleY * Math.PI / 180;
@@ -90,19 +110,21 @@
 
             if (showWireframe) {
                 ctx.strokeStyle = '#00f0ff';
-                ctx.lineWidth = 1;
+                ctx.lineWidth = 1.5;
                 ballModel.edges.forEach(edge => {
-                    ctx.beginPath();
-                    ctx.moveTo(projected[edge[0]].x, projected[edge[0]].y);
-                    ctx.lineTo(projected[edge[1]].x, projected[edge[1]].y);
-                    ctx.stroke();
+                    if (projected[edge[0]] && projected[edge[1]]) {
+                        ctx.beginPath();
+                        ctx.moveTo(projected[edge[0]].x, projected[edge[0]].y);
+                        ctx.lineTo(projected[edge[1]].x, projected[edge[1]].y);
+                        ctx.stroke();
+                    }
                 });
             }
 
             ctx.fillStyle = '#ff007f';
             projected.forEach(p => {
                 ctx.beginPath();
-                ctx.arc(p.x, p.y, 2, 0, Math.PI * 2);
+                ctx.arc(p.x, p.y, 2.5, 0, Math.PI * 2);
                 ctx.fill();
             });
 
@@ -111,7 +133,8 @@
 
         function toggleWireframe() { showWireframe = !showWireframe; }
 
-        startCamera();
+        // Start render loop immediately; camera requires button press
+        resizeCanvas();
         render();
     </script>
 </body>
