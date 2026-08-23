@@ -52,7 +52,14 @@
                     audio: false
                 });
                 video.srcObject = stream;
-                await video.play();
+                
+                // Safely handle the play promise to prevent interruption errors
+                const playPromise = video.play();
+                if (playPromise !== undefined) {
+                    playPromise.catch(error => {
+                        console.log("Auto-play prevented or interrupted:", error);
+                    });
+                }
             } catch (err) {
                 alert("Camera access failed: " + err.message);
             }
@@ -121,7 +128,6 @@
 
         resize();
         render();
-        startCamera(); // Try launching camera immediately on load
     </script>
 </body>
 </html>
