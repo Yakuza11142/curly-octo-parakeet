@@ -3,68 +3,80 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>3D Vector Sphere Projection</title>
+    <title>Real-World Vector Projection Engine</title>
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
-        body { background-color: #0b0f19; color: #f8fafc; font-family: system-ui, sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; }
-        h1 { font-size: 1.5rem; margin-bottom: 8px; color: #38bdf8; text-transform: uppercase; }
-        .stage { position: relative; width: 100vw; max-width: 640px; height: 60vh; max-height: 480px; border-radius: 12px; overflow: hidden; border: 2px solid #38bdf8; box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
+        body { background-color: #0b0f19; color: #f8fafc; font-family: system-ui, sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; overflow: hidden; }
+        h1 { position: absolute; top: 12px; z-index: 10; font-size: 1.1rem; color: #38bdf8; text-transform: uppercase; letter-spacing: 1px; background: rgba(15, 23, 42, 0.8); padding: 6px 12px; border-radius: 20px; }
+        .stage { position: relative; width: 100vw; height: 100vh; }
         video { position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover; }
-        canvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; }
-        .controls { margin-top: 16px; display: flex; gap: 12px; flex-wrap: wrap; justify-content: center; }
-        button { background: #0284c7; color: #fff; border: none; padding: 10px 18px; border-radius: 6px; font-weight: 600; cursor: pointer; }
-        button:hover { background: #0369a1; }
-        #errorMsg { color: #ef4444; margin-top: 10px; font-size: 0.9rem; text-align: center; }
+        canvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 2; }
+        .controls { position: absolute; bottom: 20px; z-index: 10; display: flex; gap: 10px; width: 90%; justify-content: center; }
+        button { background: #0284c7; color: #fff; border: none; padding: 12px 20px; border-radius: 8px; font-weight: 600; cursor: pointer; box-shadow: 0 4px 12px rgba(0,0,0,0.4); }
+        button:active { background: #0369a1; }
+        #info { position: absolute; top: 50px; z-index: 10; font-size: 0.8rem; color: #94a3b8; text-align: center; width: 100%; }
     </style>
 </head>
 <body>
 
-    <h1>Vector Projection Engine</h1>
+    <h1>AR Real-World Vector Projection</h1>
+    <div id="info">Tap anywhere on the live camera feed to project vectors into the real world.</div>
+
     <div class="stage">
-        <!-- added playsinline for mobile iOS/Android compatibility -->
         <video id="webcam" autoplay playsinline muted></video>
         <canvas id="vectorCanvas"></canvas>
     </div>
 
     <div class="controls">
-        <button onclick="startCamera()">Start Camera</button>
-        <button onclick="toggleWireframe()">Toggle Wireframe/Points</button>
+        <button onclick="startCamera()">Enable Camera</button>
+        <button onclick="clearProjections()">Clear Projections</button>
     </div>
-    <div id="errorMsg"></div>
 
     <script>
         const video = document.getElementById('webcam');
         const canvas = document.getElementById('vectorCanvas');
         const ctx = canvas.getContext('2d');
-        const errorMsg = document.getElementById('errorMsg');
 
         let angleX = 0, angleY = 0;
-        let showWireframe = true;
-        let stream = null;
+        let activeProjections = []; // Real-world target positions tapped by user
 
-        // Resize canvas to match video container
         function resizeCanvas() {
-            canvas.width = canvas.parentElement.clientWidth;
-            canvas.height = canvas.parentElement.clientHeight;
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
         }
         window.addEventListener('resize', resizeCanvas);
 
         async function startCamera() {
-            errorMsg.innerText = "";
             try {
-                // Request environment facing camera (back camera) for mobile AR projection
-                stream = await navigator.mediaDevices.getUserMedia({
-                    video: { facingMode: "environment" } 
+                const stream = await navigator.mediaDevices.getUserMedia({
+                    video: { facingMode: { exact: "environment" } } // Forces back camera
                 });
                 video.srcObject = stream;
-                // Ensure video plays on mobile
                 video.play();
                 resizeCanvas();
             } catch (err) {
-                errorMsg.innerText = "Camera access error: " + err.message + ". Please ensure permissions are granted in your browser settings.";
-                console.error(err);
+                // Fallback for devices without strict environment camera labels
+                try {
+                    const fallbackStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
+                    video.srcObject = fallbackStream;
+                    video.play();
+                    resizeCanvas();
+                } catch (e) {
+                    alert("Camera error: " + e.message);
+                }
             }
         }
+
+        // Tap screen to place vectors onto physical targets
+        window.addEventListener('click', (e) => {
+            if (e.target.tagName !== 'BUTTON') {
+                activeProjections.push({
+                    x: e.clientX,
+                    y: e.clientY,
+                    scale: 0.8 + Math.random() * 0.4
+                });
+            }
+        });
 
         function generateSphereVectors(radius, rings, segments) {
             const vertices = [], edges = [];
@@ -89,28 +101,32 @@
             return { vertices, edges };
         }
 
-        // Adjust radius based on screen size
-        const ballModel = generateSphereVectors(80, 14, 14);
+        const ballModel = generateSphereVectors(50, 10, 10);
 
-        function project(point) {
+        function projectPoint(point, originX, originY, scale) {
             const radX = angleX * Math.PI / 180, radY = angleY * Math.PI / 180;
             let x1 = point.x * Math.cos(radY) + point.z * Math.sin(radY);
             let z1 = -point.x * Math.sin(radY) + point.z * Math.cos(radY);
             let y2 = point.y * Math.cos(radX) - z1 * Math.sin(radX);
             let z2 = point.y * Math.sin(radX) + z1 * Math.cos(radX);
-            const fov = 400 / (400 + z2);
-            return { x: (x1 * fov) + (canvas.width / 2), y: (y2 * fov) + (canvas.height / 2) };
+            const fov = 300 / (300 + z2);
+            return { 
+                x: (x1 * scale * fov) + originX, 
+                y: (y2 * scale * fov) + originY 
+            };
         }
 
         function render() {
             ctx.clearRect(0, 0, canvas.width, canvas.height);
-            angleX += 0.8; angleY += 1.2;
+            angleX += 1.0; 
+            angleY += 1.5;
 
-            const projected = ballModel.vertices.map(v => project(v));
+            // Render vector sphere at every tapped real-world location
+            activeProjections.forEach(target => {
+                const projected = ballModel.vertices.map(v => projectPoint(v, target.x, target.y, target.scale));
 
-            if (showWireframe) {
                 ctx.strokeStyle = '#00f0ff';
-                ctx.lineWidth = 1.5;
+                ctx.lineWidth = 1;
                 ballModel.edges.forEach(edge => {
                     if (projected[edge[0]] && projected[edge[1]]) {
                         ctx.beginPath();
@@ -119,21 +135,22 @@
                         ctx.stroke();
                     }
                 });
-            }
 
-            ctx.fillStyle = '#ff007f';
-            projected.forEach(p => {
-                ctx.beginPath();
-                ctx.arc(p.x, p.y, 2.5, 0, Math.PI * 2);
-                ctx.fill();
+                ctx.fillStyle = '#ff007f';
+                projected.forEach(p => {
+                    ctx.beginPath();
+                    ctx.arc(p.x, p.y, 2, 0, Math.PI * 2);
+                    ctx.fill();
+                });
             });
 
             requestAnimationFrame(render);
         }
 
-        function toggleWireframe() { showWireframe = !showWireframe; }
+        function clearProjections() {
+            activeProjections = [];
+        }
 
-        // Start render loop immediately; camera requires button press
         resizeCanvas();
         render();
     </script>
